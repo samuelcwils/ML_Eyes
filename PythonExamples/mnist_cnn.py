@@ -59,7 +59,7 @@ model.summary()
 # Train the model
 
 batch_size = 128
-epochs = 5
+epochs = 15
 
 model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 

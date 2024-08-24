@@ -15,10 +15,10 @@ from pathlib import Path
 
 
 # Set path to dataset
-data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
+# data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
 
 # Get max and min sizes of the images and masks
-max_height, max_width, min_height, min_width = shape_maxmin(data_path)
+# max_height, max_width, min_height, min_width = shape_maxmin(data_path)
 
 #print(f"Min Height:\t {min_height}") 
 #print(f"Min Width:\t {min_width}") 
@@ -82,13 +82,14 @@ def getPic(img_path, min_height, min_width):
 
 
 
-print(f"Loading dataset and resizing to\t {min_height, min_width}") 
-dataX, dataY = get_ds(data_path, min_height, min_width)
+# print(f"Loading dataset and resizing to\t {min_height, min_width}") 
+# dataX, dataY = get_ds(data_path, min_height, min_width)
 
-print('dataX (images) shape: ', dataX.shape)
-print('dataY (masks) shape: ', dataY.shape)
+#print('dataX (images) shape: ', dataX.shape)
+#print('dataY (masks) shape: ', dataY.shape)
 
 
+"""
 # Test looking at one image from the data set to make sure it is still OK
 
 data = dataX[5]
@@ -105,3 +106,5 @@ Image._show(img)
 
 # For some reason the masks and the images seem to be in different
 # orders!
+
+"""

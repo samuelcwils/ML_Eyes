@@ -120,7 +120,8 @@ def merge_masks(data_path):
 
 
 #data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
-data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/train'
+#data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/train'
+data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/test'
 
 merge_masks(data_path)
 

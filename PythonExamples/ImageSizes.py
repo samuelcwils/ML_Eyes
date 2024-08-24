@@ -86,6 +86,6 @@ max_height, max_width, min_height, min_width = shape_maxmin(data_path)
 
 #print(f"Max Height:\t {max_height}") 
 #print(f"Max Width:\t {max_width}") 
-#print(f"Min Height:\t {min_height}") 
-#print(f"Min Width:\t {min_width}") 
+print(f"Min Height:\t {min_height}") 
+print(f"Min Width:\t {min_width}") 
 
