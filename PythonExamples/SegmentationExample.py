@@ -20,7 +20,9 @@ import numpy as np
 #   corresponding masks in data_path/labels/masks/0/
 
 #data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
-data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/train'
+#data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/train'
+data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/images'
+mask_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/masks'
 
 
 # Merge multiple mask files into a single (if not already done).
@@ -29,20 +31,21 @@ data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/train'
 
 # Load dataset (images and masks all resized to same size and stored in
 # an np array tensor).
-max_height, max_width, min_height, min_width = shape_maxmin(data_path)
+max_height, max_width, min_height, min_width = shape_maxmin(data_path, mask_path)
 
 #mysize = np.minimum(min_height, min_width)
 
 # Height and width need to be powers of 2 for some reason?
 # Need to remove this restriction or get these powers of two in an
 # automated way instead of hard coded.
-min_height = 512
+#min_height = 512
+min_height = 256
 min_width = 256
 
 print('Using image height ', min_height)
 print('Using image width ', min_width)
 
-dataX, dataY = get_ds(data_path, min_height, min_width)
+dataX, dataY = get_ds(data_path, mask_path, min_height, min_width)
 print('dataX (images) shape: ', dataX.shape)
 print('dataY (masks) shape: ', dataY.shape)
 
@@ -142,17 +145,16 @@ def build_unet_model(min_height, min_width):
 
 unet_model = build_unet_model(min_height, min_width)
 
-unet_model.compile(optimizer = keras.optimizers.Adam(),
-                  loss = "categorical_crossentropy")
-                  #loss = "sparse_categorical_crossentropy")
-                  #metrics="accuracy")
+unet_model.compile(optimizer = keras.optimizers.AdamW(learning_rate=0.0001),
+                  loss = "categorical_crossentropy",
+                  metrics=['accuracy', 'mse'])
 
 unet_model.summary()
 
 unet_model.fit(
     x=dataX,
     y=dataY,
-    batch_size=20,
+    batch_size=50,
     epochs=2,
     verbose="auto",
     callbacks=None,

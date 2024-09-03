@@ -10,7 +10,7 @@ import glob
 
 
 
-def shape_maxmin(datapath):
+def shape_maxmin(datapath,maskpath):
     # Load each image and get height and width.
     # Keep track of max and min height and width as we go.
     # Do the same with each mask.
@@ -23,7 +23,8 @@ def shape_maxmin(datapath):
     img_paths = list()
 
     # Loop over all data images
-    for img_path in glob.glob(datapath+"/data/*"):
+    #for img_path in glob.glob(datapath+"/data/*"):
+    for img_path in glob.glob(datapath+"/*"):
         #img_paths.append(img_path)
         #images = np.zeros((len(img_paths),256,256,3))
 
@@ -50,7 +51,8 @@ def shape_maxmin(datapath):
             min_width = mywidth
 
     # Loop over all masks
-    for img_path in glob.glob(datapath+"/labels/masks/0/*merged.png"):
+    #for img_path in glob.glob(datapath+"/labels/masks/0/*merged.png"):
+    for img_path in glob.glob(maskpath+"/*"):
 
         myimage = Image.open(img_path)
 
@@ -86,8 +88,14 @@ def shape_maxmin(datapath):
 ###
 
 
-#datapath = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
-
+##datapath = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
+#datapath = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/images'
+#maskpath = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/masks'
+#
 #max_height, max_width, min_height, min_width = shape_maxmin(data_path)
-
-
+#max_height, max_width, min_height, min_width = shape_maxmin(datapath,maskpath)
+#
+#print('max height: ', max_height)
+#print('max width: ', max_width)
+#print('min height: ', min_height)
+#print('min width: ', min_width)
