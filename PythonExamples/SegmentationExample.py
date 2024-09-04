@@ -49,6 +49,14 @@ dataX, dataY = get_ds(data_path, mask_path, min_height, min_width)
 print('dataX (images) shape: ', dataX.shape)
 print('dataY (masks) shape: ', dataY.shape)
 
+# Should really pull these out at random, not in order
+# I think there is a shuffle command I can use first?
+trainX = dataX[0:799,:,:,:]
+trainY = dataY[0:799,:,:,:]
+validX = dataX[800:899,:,:,:]
+validY = dataY[800:899,:,:,:]
+testX = dataX[900:999,:,:,:]
+testY = dataY[900:999,:,:,:]
 
 # Using U-net as an example CNN architecture.
 # https://pyimagesearch.com/2022/02/21/u-net-image-segmentation-in-keras/
@@ -147,26 +155,28 @@ unet_model = build_unet_model(min_height, min_width)
 
 unet_model.compile(optimizer = keras.optimizers.AdamW(learning_rate=0.0001),
                   loss = "categorical_crossentropy",
-                  metrics=['accuracy', 'mse'])
+                  metrics=['accuracy'])
+                  #metrics=['accuracy', 'categorical_accuracy'])
+                  #metrics=['accuracy', 'mse'])
 
 unet_model.summary()
 
 unet_model.fit(
-    x=dataX,
-    y=dataY,
+    x=trainX,
+    y=trainY,
     batch_size=50,
-    epochs=2,
+    epochs=5,
     verbose="auto",
     callbacks=None,
     validation_split=0.0,
-    validation_data=None,
+    validation_data=(validX, validY),
     shuffle=True,
     class_weight=None,
     sample_weight=None,
     initial_epoch=0,
     steps_per_epoch=None,
     validation_steps=None,
-    validation_batch_size=None,
+    validation_batch_size=20,
     validation_freq=1,
 )
 
