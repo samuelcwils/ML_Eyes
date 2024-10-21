@@ -7,10 +7,17 @@ from ultralytics import YOLO
 import fiftyone as fo
 import fiftyone.zoo as foz
 
+
+# IMPORTANT NOTE (VH 10-21-2024): the datasets from open-images-v7 are problematic. They are the
+# ones that have issues with the images and masks not being the same
+# size. Instead, I have been using data from kvasir:
+# kvasir colon polyp data downloaded from their website:
+# https://datasets.simula.no/kvasir-seg/
+# (So there is no need to use this code.) 
+
 #dataset = foz.load_zoo_dataset("quickstart")
 #dataset = tfds.load(‘open_images/v7’, split='train')
 #session = fo.launch_app(dataset)
-
 
 IMAGES = 1000
 CLASSES = ["Giraffe"]
@@ -31,6 +38,5 @@ print(dataset)
 #results = model.train(data =
 #'/Users/vhowle/Projects/image-segmentation-yolov8/config.yaml', epochs = 1, imgsz =640)
 
-# This seems to be working! But very slow. Maybe try google collab as
-# suggested in tutorial video? Or try getting this data into keras and
-# trying my own CNN there?
+# This seems to be working. But very slow. Maybe try google collab as
+# suggested in tutorial video? 
