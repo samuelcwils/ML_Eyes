@@ -158,6 +158,16 @@ def upsample_block(x, conv_features, n_filters):
     #x = double_conv_block(x, n_filters)
     return x
 
+# customizable loss function for unet network
+def bitmask_loss_fn(y_true, y_pred):
+
+    # tweakable parameters
+    lambda_L = 5.0
+    lambda_S = 0.5
+
+    # compute the loss and return that value
+    weight_matrix = tf.where(y_true - y_pred < 0, lambda_L, lambda_S)
+    return tf.math.reduce_mean(tf.abs(weight_matrix * (y_true - y_pred)))
 
 # I shortened the size of the NN by doing 1 conv2d per layer and
 # removing some of the layers. Maybe increase again when we have more
