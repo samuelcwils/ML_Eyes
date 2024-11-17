@@ -16,7 +16,7 @@ import torch
 
 
 # Set seed for randomization so we can repeat runs
-seed = 300007
+seed = 300507
 keras.utils.set_random_seed(seed)
 print('seed ', seed)
 
@@ -84,8 +84,8 @@ shuffled_Y = dataY[indices]
 # Split the dataset into training, validation, and testing sets.
 # This is currently hardcoded to having 1000 images and masks. 
 # Update to pull out percentages of dataset for each category.
-trainX = shuffled_X[0:799,:,:,:]
-trainY = shuffled_Y[0:799,:,:,:]
+trainX = shuffled_X[0:199,:,:,:]
+trainY = shuffled_Y[0:199,:,:,:]
 validX = shuffled_X[800:899,:,:,:]
 validY = shuffled_Y[800:899,:,:,:]
 testX = shuffled_X[900:999,:,:,:]
@@ -242,7 +242,7 @@ unet_model.fit(
     x=trainX,
     y=trainY,
     batch_size=50,
-    epochs=3,
+    epochs=1,
     verbose="auto",
     callbacks=None,
     validation_split=0.0,
@@ -250,7 +250,7 @@ unet_model.fit(
     #validation_data=None,
     #validation_batch_size=None,
     validation_data=(validX, validY),
-    validation_batch_size=20,
+    validation_batch_size=50,
     shuffle=False,
     class_weight=None,
     sample_weight=None,
