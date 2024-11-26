@@ -18,7 +18,6 @@ import torch
 
 import tensorflow as tf
 #import matplotlib.pyplot as plt
-import tensorflow_datasets as tfds
 from functools import partial
 import albumentations as A
 
@@ -34,8 +33,8 @@ numAugmentations = 1
 
 # Set path to dataset
 # data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/Ducks/small_train'
-datapath = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/images_small'
-maskpath = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/masks_small'
+datapath = '/home/samwilson/ML_Eyes-main/DataImages/kvasir/Kvasir-SEG/images'
+maskpath = '/home/samwilson/ML_Eyes-main/DataImages/kvasir/Kvasir-SEG/masks'
 
 # Get max and min sizes of the images and masks
 # max_height, max_width, min_height, min_width = shape_maxmin(data_path)

@@ -3,8 +3,6 @@
 # 8/24/24: Currently runs and builds the CNN, but losses are huge
 # and grow with each epoch. Next: try a different (custom) loss function.
 
-from ImageSizes import shape_maxmin
-from LoadDataset import get_ds
 import keras
 from keras import layers
 import tensorflow as tf
@@ -12,15 +10,18 @@ from tensorflow import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
+import neptune
+from neptune.integrations.tensorflow_keras import NeptuneCallback
+from NeptunePredictionsLogger import NeptunePredictionsLogger
+from TensorflowLoadDataset import get_tensorflow_dataset
 
 # Set seed for randomization so we can repeat runs
-seed = 300507
-keras.utils.set_random_seed(seed)
-print('seed ', seed)
+# seed = 300507
+# keras.utils.set_random_seed(seed)
+# print('seed ', seed)
 
-tf.config.experimental.enable_op_determinism()
-
+#tf.config.experimental.enable_op_determinism()
+#Determinism breaks things for me. Has to do with the maxpool operation. I think it's CUDA. - Sam
 
 # Set path for dataset.
 # Assumes the following structure:
@@ -40,19 +41,6 @@ mask_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/masks'
 #data_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/images_small'
 #mask_path = '/Users/vhowle/Projects/ML_Eyes/DataImages/kvasir/Kvasir-SEG/masks_small'
 
-# Merge multiple mask files into a single (if not already done).
-# Already merged in this case.
-# The kvasir data set did not have the problem of having multiple masks
-# per image, and that should also not be a problem with our real pig
-# data. 
-
-
-# Load dataset (images and masks all resized to same size and stored in
-# an np array tensor).
-max_height, max_width, min_height, min_width = shape_maxmin(data_path, mask_path)
-
-#mysize = np.minimum(min_height, min_width)
-
 # As my U-Net code is currently written, height and width need to be
 # powers of 2.
 # Consider updating to remove this restriction or at least get these powers of two in an
@@ -66,51 +54,27 @@ max_height, max_width, min_height, min_width = shape_maxmin(data_path, mask_path
 min_height = 256
 min_width = 256
 
-print('Using image height ', min_height)
-print('Using image width ', min_width)
+train_batch_size = 8
+valid_batch_size = 8
+test_batch_size = 8
 
-dataX, dataY = get_ds(data_path, mask_path, min_height, min_width)
-print('dataX (images) shape: ', dataX.shape)
-print('dataY (masks) shape: ', dataY.shape)
+dataset = get_tensorflow_dataset((min_width, min_height), data_path, mask_path) 
+train_dataset = dataset.take(len(dataset) * 8 // 10)
+valid_dataset = dataset.skip(len(dataset) * 8 // 10)
 
-# Shuffle the indices in case there is any order to the downloaded data. 
-indices = np.arange(dataX.shape[0])
-np.random.shuffle(indices)
-# Apply the shuffled indices to the data
-shuffled_X = dataX[indices]
-shuffled_Y = dataY[indices]
+test_dataset = valid_dataset.skip(len(valid_dataset) // 2)
+valid_dataset = valid_dataset.take(len(valid_dataset) // 2)
 
-# Split the dataset into training, validation, and testing sets.
-# This is currently hardcoded to having 1000 images and masks. 
-# Update to pull out percentages of dataset for each category.
-trainX = shuffled_X[0:199,:,:,:]
-trainY = shuffled_Y[0:199,:,:,:]
-validX = shuffled_X[800:899,:,:,:]
-validY = shuffled_Y[800:899,:,:,:]
-testX = shuffled_X[900:999,:,:,:]
-testY = shuffled_Y[900:999,:,:,:]
+#all this take and skip stuff allocates the images to the different datasets train, valid, and test
+
+train_dataset = train_dataset.batch(train_batch_size).prefetch(tf.data.AUTOTUNE)
+valid_dataset = valid_dataset.batch(valid_batch_size).prefetch(tf.data.AUTOTUNE)
+test_dataset = test_dataset.batch(test_batch_size).prefetch(tf.data.AUTOTUNE)
 
 
 # Using U-net as an example CNN architecture.
 # U-net is useful for segmentation.
 # https://pyimagesearch.com/2022/02/21/u-net-image-segmentation-in-keras/
-
-
-# Loop this over images to do augmentation.
-# This is not done yet.
-#def augment(input_image, input_mask):
-   #if tf.random.uniform(()) > 0.5:
-       ## Random flipping of the image and mask
-       #input_image = tf.image.flip_left_right(input_image)
-       #input_mask = tf.image.flip_left_right(input_mask)
-   #return input_image, input_mask
-
-# Loop this over images to normalize
-# This is not done yet. 
-#def normalize(input_image, input_mask):
-   #input_image = tf.cast(input_image, tf.float32) / 255.0
-   #input_mask -= 1
-   #return input_image, input_mask
 
 
 # Do a set of two convolutions, each followed by relu.
@@ -238,7 +202,7 @@ unet_model = build_unet_model(min_height, min_width)
 
 unet_model.compile(optimizer = keras.optimizers.AdamW(learning_rate=0.0001),
                   loss = "categorical_crossentropy",
-                  metrics=['accuracy'])
+                  metrics=['categorical_accuracy'])
                   #metrics=['accuracy', 'categorical_accuracy'])
                   #metrics=['accuracy', 'mse'])
 
@@ -246,20 +210,19 @@ unet_model.compile(optimizer = keras.optimizers.AdamW(learning_rate=0.0001),
 # each layer and number of parameters to be trained etc. 
 unet_model.summary()
 
+#Change this to use your own account's api token
+# run = neptune.init_run(project='knightenjoyer15/Project', api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3ZTE1ZGJhZi1jOTMyLTRiM2QtYTY3MC1jYzJlZTYyYTczODEifQ==")
+
+# predictions_neptune_callback = NeptunePredictionsLogger(run, unet_model, test_dataset)
+# normal_neptune_callback = NeptuneCallback(run=run, log_on_batch=True)
+
 # Train the model.
 unet_model.fit(
-    x=trainX,
-    y=trainY,
-    batch_size=50,
-    epochs=1,
+    x=train_dataset,
+    epochs=3,
     verbose="auto",
-    callbacks=None,
-    validation_split=0.0,
-    #validation_split=0.2,
-    #validation_data=None,
-    #validation_batch_size=None,
-    validation_data=(validX, validY),
-    validation_batch_size=50,
+    #callbacks=[predictions_neptune_callback, normal_neptune_callback],
+    validation_data=valid_dataset,
     shuffle=False,
     class_weight=None,
     sample_weight=None,
@@ -283,6 +246,6 @@ unet_model.fit(
 # Evaluate the trained model
 
 # Model evaluation (with the test data).
-score = unet_model.evaluate(testX, testY, verbose=0)
+score = unet_model.evaluate(test_dataset, verbose=0)
 print("Test loss:", score[0])
 print("Test accuracy:", score[1])
