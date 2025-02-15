@@ -2,16 +2,15 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from dataset import get_tensorflow_dataset
+from dataset import get_tensorflow_dataset_split
 
 input_img_path = 'Kvasir-SEG/images/'
 mask_img_path = 'Kvasir-SEG/masks/'
 
-min_height = 256
-min_width = 256
+height = 256
+width = 256
 
-
-#this one displays a sample images, masks, and predictions 
+#this one displays sample images, masks, and predictions 
 def display_predictions(model, dataset, num_images=3):
     sample = next(iter(dataset))
     images = sample[0]
@@ -82,7 +81,8 @@ def display_dataset(dataset, num_images=3):
 
 seed = 500
 
-dataset = get_tensorflow_dataset((min_width, min_height), input_img_path, mask_img_path, seed) 
-dataset = dataset.batch(8)
+num_images = 8
+train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, num_images)
 
-display_dataset(dataset, num_images=8)
+display_dataset(test_dataset, 2)
+#score = model.evaluate(test_dataset)

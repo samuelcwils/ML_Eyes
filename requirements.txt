@@ -1,0 +1,14 @@
+tensorflow[and-cuda]
+keras
+matplotlib
+neptune
+neptune-optuna
+neptune-tensorflow-keras
+optuna
+albumentations
+opencv-python
+numpy
+argparse
+keras_unet_collection
+
+#add versions maybe?

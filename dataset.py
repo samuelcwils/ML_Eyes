@@ -14,7 +14,10 @@ def get_tensorflow_dataset(
     input_img_path,
     mask_img_path,
     seed,
-    shuffle_buffer_fraction=0.1
+    shuffle = True,
+    shuffle_buffer_fraction = 0.3,
+    reshuffle_each_iteration = False
+    
 ):
     """Returns a TF Dataset."""
 
@@ -40,7 +43,7 @@ def get_tensorflow_dataset(
         transforms = A.Compose([
                 A.Rotate(limit=10, border_mode=cv2.BORDER_CONSTANT),
                 A.HorizontalFlip(),
-            ],additional_targets={'mask': 'image'})
+            ],additional_targets={'mask': 'image'}, seed=seed)
     
         def aug_fn(image, mask):
             data = {"image":image, "mask":mask}
@@ -66,22 +69,37 @@ def get_tensorflow_dataset(
     dataset = tf_data.Dataset.from_tensor_slices((input_img_paths, mask_img_paths))
     dataset = dataset.map(load_imgs, num_parallel_calls=tf_data.AUTOTUNE) #the function put into .map is applied dynamically when a batch is requested
     dataset = dataset.map(augment_data, num_parallel_calls=tf_data.AUTOTUNE)
-    dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=True)
+
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=False, seed=seed)
 
     return dataset
 
 
-def get_tensorflow_dataset_split(img_size, input_img_path, mask_img_path, seed, batch_size, train_fraction, valid_fraction, test_fraction):
+def get_tensorflow_dataset_split(
+    img_size, 
+    input_img_path, 
+    mask_img_path, 
+    seed, 
+    train_fraction, 
+    valid_fraction, 
+    test_fraction,  
+    train_batch_size,
+    valid_batch_size = 16,
+    test_batch_size = 8,   
+    shuffle = True,
+    shuffle_buffer_fraction = 0.3,
+    reshuffle_each_iteration = True
+):
     
     if(train_fraction + valid_fraction + test_fraction != 1):
         raise Exception("Dataset fractions do not add up to one!")
-        
-    train_batch_size = batch_size
-    valid_batch_size = 16
-    test_batch_size = 1
     
     dataset = get_tensorflow_dataset(img_size, input_img_path, mask_img_path, seed) 
     #dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=True)
+
+    keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
+    tf.config.experimental.enable_op_determinism()
 
     train_dataset = dataset.take(int(len(dataset) * train_fraction)) #allot samples to train
     temp_dataset = dataset.skip(int(len(dataset) * train_fraction)) #allot rest to other datasets. store the non train samples in a temp variable
@@ -91,6 +109,11 @@ def get_tensorflow_dataset_split(img_size, input_img_path, mask_img_path, seed, 
     print("train_dataset size: " + str(train_dataset.cardinality()))
     print("valid_dataset size: " + str(valid_dataset.cardinality()))
     print("test_dataset size: " + str(test_dataset.cardinality()))
+
+    if shuffle:
+        train_dataset = train_dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=reshuffle_each_iteration, seed=seed)
+        valid_dataset = valid_dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=reshuffle_each_iteration, seed=seed)
+        test_dataset = test_dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=reshuffle_each_iteration, seed=seed)
     
     train_dataset = train_dataset.batch(train_batch_size).prefetch(tf.data.AUTOTUNE)
     valid_dataset = valid_dataset.batch(valid_batch_size).prefetch(tf.data.AUTOTUNE)
