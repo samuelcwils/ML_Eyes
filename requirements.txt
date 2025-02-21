@@ -10,5 +10,6 @@ opencv-python
 numpy
 argparse
 keras_unet_collection
+joblib
 
 #add versions maybe?

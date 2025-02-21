@@ -17,6 +17,8 @@ import os
 from getmodel import getmodel
 from args import get_args
 from getloss import getloss
+import joblib
+from savecheckpoint import SaveCheckpoint
 
 def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name):
     tf.keras.backend.clear_session()
@@ -141,6 +143,7 @@ def objective(trial, model_args, training_args):
 
     # Train model and return the evaluation metric
     #use the training_args dict again become some options are not selected by optuna (e.g. seed)
+    accuracy = train(model, trial.number, learning_rate=learning_rate, loss=loss, optimizer=optimizer, **training_dict) 
     return train(model, trial.number, learning_rate=learning_rate, loss=loss, optimizer=optimizer, **training_dict) 
 
 if __name__=='__main__':
@@ -151,6 +154,7 @@ if __name__=='__main__':
     n_trials = training_args.pop('n_trials')
     use_optuna = training_args.pop('use_optuna')
     multi_gpu= training_args.pop('multi_gpu')
+    load_checkpoint = training_args.pop("load_checkpoint")
     name = training_args["name"]
     use_neptune = training_args['use_neptune']
     use_mixed_precision = training_args['use_mixed_precision']
@@ -160,16 +164,20 @@ if __name__=='__main__':
 
     #with hyperparameter optimization
     if(use_optuna):
-        
-        study = optuna.create_study(direction='maximize')
-        objective_seeded = partial(objective, model_args=model_args, training_args=training_args) #input seed for determinism
+        if(load_checkpoint):
+            study = joblib.load(name + "_checkpoint.pkl")
+        else:
+            study = optuna.create_study(direction='maximize')
+        objective_seeded = partial(objective, model_args=model_args, training_args=training_args) #need to pass study in so I can save it
         
         #create a neptune instance for the optuna study
         callbacks = []
         if(use_neptune):
             study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key)
             neptune_callback = npt_utils.NeptuneCallback(study_run) #for logging metadata about hyperparamter optimization
-            callbacks = [neptune_callback]
+            callbacks.append(neptune_callback)
+
+        callbacks.append(SaveCheckpoint(name=name)) #add callback to save optuna study after every trial
 
         if(multi_gpu):
             gpus = tf.config.list_logical_devices('GPU')

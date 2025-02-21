@@ -20,6 +20,7 @@ def get_args():
     parser.add_argument("--optimizer", nargs="*", type=str, choices=["adam", "sgd"],
                         required=True, help="Optimizer for training")
     parser.add_argument("--name", default=" ", type=str, help="The name of the study")
+    parser.add_argument("--load_checkpoint", action="store_true", help="Name of file to load as a checkpoint for the optuna study")
 
     #model args
     parser.add_argument("--im_width", type=int, required=True, help="Image width")
@@ -50,16 +51,16 @@ def get_args():
     # Convert Namespace object to dictionary
     args_dict = vars(args)
 
-    # remove args that are not set
-    pop_list = [] #list of values to remove
-    for key, value in args_dict.items():
-        if value == None:
-            pop_list.append(key)
-    for key in pop_list:
-        args_dict.pop(key)
+    # # remove args that are not set
+    # pop_list = [] #list of values to remove
+    # for key, value in args_dict.items():
+    #     if value == None:
+    #         pop_list.append(key)
+    # for key in pop_list:
+    #     args_dict.pop(key)
     
     #seperate arguments into those used for training and those used for models
-    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name"]
+    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name", "load_checkpoint"]
     training_dict = {key: args_dict.pop(key) for key in training_args if key in args_dict}
     training_dict['im_width'] = args_dict['im_width']
     training_dict['im_height'] = args_dict['im_height'] #img size is both a training and model creation parameter
