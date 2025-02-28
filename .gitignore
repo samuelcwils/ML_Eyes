@@ -1,0 +1,7 @@
+.neptune/
+__pycache__/
+.vscode/
+build/
+dist/
+train.spec
+*.pkl
