@@ -1,3 +1,6 @@
+"""
+This file contains functions to load the dataset into a tensorflow dataset. It gives options to allow random or pre determined 
+subsets of the data to be used for training, validation and testing. It also allows for augmentation of the data."""
 import keras
 import numpy as np
 from tensorflow import data as tf_data

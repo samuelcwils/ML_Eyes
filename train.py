@@ -1,3 +1,7 @@
+"""This file trains the model.
+It uses the keras library to train the model. It also uses the neptune library to log the training process and the predictions.
+It uses the optuna library to optimize the hyperparameters of the model.
+This is the bulk of the code."""
 import keras
 from keras import layers
 import tensorflow as tf
@@ -18,7 +22,7 @@ from args import get_args
 import joblib
 from getloss import getloss
 from savecheckpoint import SaveCheckpoint
-from customloss import get_bitmask_loss_fn
+#from customloss import get_bitmask_loss_fn
 
 def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, high_punish=5, low_punish=1):
     tf.keras.backend.clear_session()

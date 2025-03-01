@@ -1,3 +1,4 @@
+"""This file contains code to evaluate the model on the test set and display some sample images, masks, and predictions."""
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np

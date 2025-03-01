@@ -1,3 +1,5 @@
+"""This file is used to test the custom loss function. 
+It creates a canvas where the user can draw and see the loss value in real-time."""
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf

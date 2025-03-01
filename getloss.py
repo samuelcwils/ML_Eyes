@@ -1,3 +1,5 @@
+"""This file contains the custom loss functions used in the model. 
+The custom loss functions are used to train the model and are passed to the model during compilation."""
 import tensorflow as tf
 import keras
 
