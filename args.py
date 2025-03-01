@@ -11,10 +11,12 @@ def get_args():
     parser.add_argument("--epochs", type=int, required=True, help="Number of training epochs")
     parser.add_argument("--learning_rate", type=float, nargs="*", metavar=("MIN", "MAX"),
                         required=True, help="Learning rate value or range for optimization")
-    parser.add_argument("--loss", type=str, nargs="*", choices=["dice", "binary_crossentropy"],
+    parser.add_argument("--loss", type=str, nargs="*", choices=["dice", "binary_crossentropy", "custom_old", "custom_new"],
                         required=True, help="Loss function")
+    parser.add_argument("--high_punish", type=float, help="Weights how much overlabeling affects the custom loss function")
+    parser.add_argument("--low_punish", type=float, help="Weights how much underlabeling affects the custom loss function")
     parser.add_argument("--batch_size", type=int, required=True, help="Batch size for training")
-    parser.add_argument("--n_trials", type=int, required=True, help="Number of trials for hyperparamter optimization")
+    parser.add_argument("--n_trials", type=int, help="Number of trials for hyperparamter optimization")
     parser.add_argument("--use_mixed_precision", action="store_true", help="Enable mixed precision compute")
     parser.add_argument("--multi_gpu", action="store_true", help="Enable the use of multiple gpus")
     parser.add_argument("--optimizer", nargs="*", type=str, choices=["adam", "sgd"],
@@ -45,7 +47,7 @@ def get_args():
 
     # replaces lists with single values to just the single values. Don't want to pass in a list when there should be an integer
     for key, value in vars(args).items():
-        if isinstance(value, list) and len(value) and type(value[0] != 'string') == 1:
+        if isinstance(value, list) and (len(value) == 1 ) and (type(value[0]) != str):
             setattr(args, key, value[0])  # Convert single-item list to its element
 
     # Convert Namespace object to dictionary
@@ -60,7 +62,7 @@ def get_args():
     #     args_dict.pop(key)
     
     #seperate arguments into those used for training and those used for models
-    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name", "load_checkpoint"]
+    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "high_punish", "low_punish", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name", "load_checkpoint"]
     training_dict = {key: args_dict.pop(key) for key in training_args if key in args_dict}
     training_dict['im_width'] = args_dict['im_width']
     training_dict['im_height'] = args_dict['im_height'] #img size is both a training and model creation parameter

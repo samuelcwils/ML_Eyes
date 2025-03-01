@@ -1,6 +1,7 @@
 import optuna
 import joblib
 
+#callback for optuna
 class SaveCheckpoint:
     def __init__(self, name):
         self.name = name

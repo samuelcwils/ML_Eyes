@@ -7,7 +7,6 @@ import numpy as np
 import neptune
 from neptune.integrations.tensorflow_keras import NeptuneCallback
 from dataset import get_tensorflow_dataset_split
-from unet import build_unet_model
 from neptunelogger import NeptunePredictionsLogger
 from keras_unet_collection import models
 from functools import partial
@@ -16,15 +15,13 @@ import optuna
 import os
 from getmodel import getmodel
 from args import get_args
-from getloss import getloss
 import joblib
+from getloss import getloss
 from savecheckpoint import SaveCheckpoint
+from customloss import get_bitmask_loss_fn
 
-def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name):
+def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, high_punish=5, low_punish=1):
     tf.keras.backend.clear_session()
-    keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
-    tf.config.experimental.enable_op_determinism()
-
     
     # This dataset works better and the images and masks have the same size.
     input_img_path = 'Kvasir-SEG/images/'
@@ -54,8 +51,10 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
 
     optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
 
+    loss_fn = getloss(loss)
+
     model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
-                      loss = getloss(loss, model.outputs),
+                      loss=loss_fn,
                       metrics=[keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)])
                       #metrics=['accuracy', 'categorical_accuracy'])
                       #metrics=['accuracy', 'mse'])
@@ -151,13 +150,16 @@ if __name__=='__main__':
     training_args, model_args = get_args()
 
     #some argparse options need to be taken out of the dictionaries
-    n_trials = training_args.pop('n_trials')
     use_optuna = training_args.pop('use_optuna')
-    multi_gpu= training_args.pop('multi_gpu')
+    n_trials = training_args.pop('n_trials')
     load_checkpoint = training_args.pop("load_checkpoint")
+    multi_gpu= training_args.pop('multi_gpu')
     name = training_args["name"]
     use_neptune = training_args['use_neptune']
-    use_mixed_precision = training_args['use_mixed_precision']
+    seed = training_args['seed']
+    keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
+    tf.config.experimental.enable_op_determinism()
+
 
     project='knightenjoyer15/Project'
     api_key = os.environ.get('NEPTUNE_API_TOKEN')
@@ -197,6 +199,6 @@ if __name__=='__main__':
             gpus = tf.config.list_logical_devices('GPU')
             strategy = tf.distribute.MirroredStrategy(gpus)
             with strategy.scope():
-                train(model, 0, use_neptune, use_mixed_precision, **training_args)
+                train(model=model, trial_num=0, **training_args)
         else :
-            train(model, 0, use_neptune, use_mixed_precision, **training_args)
+            train(model=model, trial_num=0,**training_args)
