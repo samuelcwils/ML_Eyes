@@ -1,3 +1,5 @@
+"""This is a script to parse command line arguments for training image segmentation models.
+It includes options for hyperparameter tuning, metadata logging, and model configuration."""
 import argparse
 
 def get_args():
@@ -46,8 +48,9 @@ def get_args():
     args = parser.parse_args()
 
     # replaces lists with single values to just the single values. Don't want to pass in a list when there should be an integer
+    
     for key, value in vars(args).items():
-        if isinstance(value, list) and (len(value) == 1 ) and (type(value[0]) != str):
+        if isinstance(value, list) and (len(value) == 1 ): #and (type(value[0]) != str): #I commented this out because it was causing problems with calling the model name -Ian
             setattr(args, key, value[0])  # Convert single-item list to its element
 
     # Convert Namespace object to dictionary

@@ -104,7 +104,7 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
 
 #function that wraps around the training loop. used for hyperparamter searching with optuna
 def objective(trial, model_args, training_args):
-
+    #why pop varibles in the first place? -Ian
     #maybe this is a bad solution but because im popping variables I need to make a copy of the arg dicts so each iteration they can be used again
     training_dict = training_args.copy()
     model_dict = model_args.copy()

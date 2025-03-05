@@ -1,5 +1,6 @@
 """This file is used to test the custom loss function. 
-It creates a canvas where the user can draw and see the loss value in real-time."""
+It creates a canvas where the user can draw and see the loss value in real-time.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -65,8 +66,8 @@ def get_bwh_loss_fn(high_punish, low_punish):
         big_loss_matrix = tf.cast(tf.where(elementwise_diff > 0), tf.float32)
         small_loss_matrix = tf.cast(tf.where(elementwise_diff < 0), tf.float32)
         centroid = tf.math.divide(tf.reduce_sum(big_loss_matrix, 0), tf.cast(tf.size(big_loss_matrix), tf.float32))
-        big_loss = tf.norm(big_loss_matrix - centroid, 2, axis = 0)
-        small_loss = tf.norm(small_loss_matrix - centroid, 2, axis = 0)
+        big_loss = tf.norm(big_loss_matrix - centroid, 2)
+        small_loss = tf.norm(small_loss_matrix - centroid, 2)
         total_loss = big_loss + small_loss
         return total_loss
     return bwh_loss

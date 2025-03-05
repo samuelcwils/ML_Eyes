@@ -8,15 +8,23 @@ import keras
 def getloss(loss_name, high_punish = 1.3, low_punish = 1):
     if(loss_name == 'custom_new'):
         def bwh_loss(y_true, y_pred):
-
-            elementwise_diff = tf.cast(y_true - y_pred, tf.float32)
-            big_loss_matrix = tf.cast(tf.where(elementwise_diff > 0), tf.float32)
-            small_loss_matrix = tf.cast(tf.where(elementwise_diff < 0), tf.float32)
-            centroid = tf.math.divide(tf.reduce_sum(big_loss_matrix, 0), tf.cast(tf.size(big_loss_matrix), tf.float32))
-            big_loss = tf.norm(big_loss_matrix - centroid, 2, axis = 0)
-            small_loss = tf.norm(small_loss_matrix - centroid, 2, axis = 0)
-            total_loss = big_loss + small_loss
-            return total_loss
+#approach to getting this to work. Do all non differentiable operations on truth matrix
+#also it might be better to do this computation outside the model, and just call it. 
+            y_cast=tf.cast(y_true, tf.float32)
+            centroid = tf.reduce_mean(tf.cast(tf.where(y_true>0),tf.float32), axis=0)
+            in_indicies = tf.where(y_true > 0)
+            out_indicies = tf.where(y_true < 0.5)
+            weight_in = tf.norm(tf.cast(in_indicies, tf.float32) - centroid, axis=1)
+            weight_out = tf.norm(tf.cast(out_indicies, tf.float32) - centroid, axis=1)
+            updated_truth_in_weight=tf.tensor_scatter_nd_update(y_cast, in_indicies, weight_in)
+            weight_matrix=tf.tensor_scatter_nd_update(updated_truth_in_weight, out_indicies, weight_out)
+            
+            elementwise_diff = y_true - y_pred
+            weighted_loss=weight_matrix * elementwise_diff
+            positive_loss=tf.abs(weighted_loss)
+            #sums the values and takes mean
+            loss = tf.math.reduce_mean(positive_loss)
+            return loss
         return bwh_loss
     elif(loss_name == "custom_old"):
         def bitmask_loss_fn(y_true, y_pred):
