@@ -1,7 +1,5 @@
-"""This file is used to test the custom loss function. 
-It creates a canvas where the user can draw and see the loss value in real-time.
-"""
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from PIL import Image
@@ -59,18 +57,60 @@ def draw(event):
         im.set_data(canvas)
         plt.draw()
 
-def get_bwh_loss_fn(high_punish, low_punish):
-    def bwh_loss(y_true, y_pred):
 
-        elementwise_diff = tf.cast(y_true - y_pred, tf.float32)
-        big_loss_matrix = tf.cast(tf.where(elementwise_diff > 0), tf.float32)
-        small_loss_matrix = tf.cast(tf.where(elementwise_diff < 0), tf.float32)
-        centroid = tf.math.divide(tf.reduce_sum(big_loss_matrix, 0), tf.cast(tf.size(big_loss_matrix), tf.float32))
-        big_loss = tf.norm(big_loss_matrix - centroid, 2)
-        small_loss = tf.norm(small_loss_matrix - centroid, 2)
-        total_loss = big_loss + small_loss
-        return total_loss
-    return bwh_loss
+def get_bwh_loss_fn(loss_type):
+    if loss_type == "bwh_loss":
+        def bwh_loss(y_true, y_pred):
+    #approach to getting this to work. Do all non differentiable operations on truth matrix
+    #also it might be better to do this computation outside the model, and just call it. 
+            y_cast=tf.cast(y_true, tf.float32)
+            centroid = tf.reduce_mean(tf.cast(tf.where(y_true>0),tf.float32), axis=0) #index of the centroid of the truth matrix
+
+            #get the indicies of the in and out regions
+            in_indicies = tf.where(y_true > 0)
+            out_indicies = tf.where(y_true < 0.5)
+
+            #get the area of regions
+            area_in = tf.cast(tf.math.count_nonzero(y_true > 0.5) , tf.float32)
+            area_out = tf.cast(tf.math.count_nonzero(y_true < 0.5) , tf.float32)
+
+            weight_in = 2 - (tf.norm(tf.cast(in_indicies, tf.float32) - centroid, axis=1)) * (tf.sqrt(tf.constant(math.pi) / area_in))  #start punish in follows  2 - (normalized norm)
+            weight_out = 1 + tf.norm(tf.cast(out_indicies, tf.float32) - centroid, axis=1) * (tf.sqrt(tf.constant(math.pi) / (area_out + area_in))) #start punish out follows 1 + (normalized norm)
+
+            #update the truth matrix with the weights
+            updated_truth_in_weight=tf.tensor_scatter_nd_update(y_cast, in_indicies, weight_in)
+            weight_matrix=tf.tensor_scatter_nd_update(updated_truth_in_weight, out_indicies, weight_out)
+
+            #compute loss
+            elementwise_diff = y_true - y_pred
+            weighted_loss=weight_matrix * elementwise_diff
+            positive_loss=tf.abs(weighted_loss)
+
+            #sums the values and takes mean
+            loss = tf.math.reduce_mean(positive_loss)
+            return loss
+        return bwh_loss
+    
+    elif loss_type == "IoU_loss":
+        def IoU_prototype_loss(y_true, y_pred):
+            y_cast=tf.cast(y_true, tf.float32)
+            centroid = tf.reduce_mean(tf.cast(tf.where(y_true>0),tf.float32), axis=0) #index of the centroid of the truth matrix
+
+            #get the indicies of the in and out regions
+            num_true = tf.cast(tf.math.count_nonzero(y_true) , tf.float32)
+            num_pred = tf.cast(tf.math.count_nonzero(y_pred) , tf.float32)
+            num_intersect = tf.cast(tf.math.count_nonzero(y_true * y_pred) , tf.float32)
+            
+            Jaccard_contribution = 1 - (num_intersect / (num_true + num_pred - num_intersect))  # Jaccard loss    
+            #variation_contribution = tf.image.total_variation(y_pred)  # Total variation loss
+            return 
+        return IoU_prototype_loss
+            
+
+            
+            
+
+
 
 def compute_loss():
     global canvas
@@ -80,14 +120,14 @@ def compute_loss():
     y_true = tf.convert_to_tensor(ground_truth_norm, dtype=tf.float32)
     y_pred = tf.convert_to_tensor(canvas_normalized, dtype=tf.float32)
 
-    loss_fn = get_bwh_loss_fn(high_punish=2.0, low_punish=1.0)
+    loss_fn = get_bwh_loss_fn()
     loss = loss_fn(y_true, y_pred)
     print("Loss:", loss.numpy())
 
 def loss_loop():
     while True:
         compute_loss()
-        time.sleep(1/60)  # 60 FPS loss updates
+        time.sleep(1/2)  # 60 FPS loss updates
 
 fig.canvas.mpl_connect("button_press_event", on_press)
 fig.canvas.mpl_connect("button_release_event", on_release)
