@@ -19,7 +19,8 @@ def get_tensorflow_dataset(
     seed,
     shuffle = True,
     shuffle_buffer_fraction = 0.3,
-    reshuffle_each_iteration = False
+    reshuffle_each_iteration = False,
+    output_names = ["out"] #for deep supervision. need multiple masks to train multiple model outputs
     
 ):
 
@@ -40,23 +41,39 @@ def get_tensorflow_dataset(
         #This can set all values greater than a certain threshold to a certain value. Could make highlited pixels 1 and others 0. Useful for some loss functions.
         
         mask_img = tf.cast(mask_img, dtype=tf.float64)
-
-        return input_img, mask_img
+            
+        mask_dict = {name: mask_img for name in output_names} #needed to provide a mask for each output when using a model that has multiple outputs
+        mask = mask_dict if len(output_names) > 1 else mask_img
+        return input_img, mask
         
     def augment_data(image, mask):
+
+        # if(type(mask) == dict):
+        #     mask_names = mask.keys()
+
         transforms = A.Compose([
                 A.Rotate(limit=10, border_mode=cv2.BORDER_CONSTANT),
                 A.HorizontalFlip(),
-            ],additional_targets={'mask': 'image'}, seed=seed)
-    
+            ],additional_targets={'mask': 'image'}, seed=seed) #apply transforms to multiple masks or one 
+        #(dict(zip(mask_names, ['image'] * len(mask)))) if type(mask) == dict else {'mask': 'image'}
+
         def aug_fn(image, mask):
+            
+            #data = {"image":image, **(dict(zip(mask_names, mask)))} if type(mask) == list else {"image":image, "mask":mask} #apply transforms to multiple masks or one 
             data = {"image":image, "mask":mask}
             aug_data = transforms(**data)
-            aug_img = aug_data["image"]
+            aug_img = aug_data.pop("image")
             aug_mask = aug_data["mask"]
+            #aug_mask = aug_data.values() if type(mask) == list else aug_data["mask"] #return a dictionary of multiple masks or just one mask
         
             return aug_img, aug_mask
 
+        # if(type(mask) == dict):
+        #     aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image] + list(mask.values()), Tout=[tf.float64, tf.float64]) #I have to use a list beca
+        #     aug_mask = (dict(zip(mask_names, aug_mask.numpy().tolist())))
+        #     aug_img = tf.convert_to_tensor(aug_img)
+        #     aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
+        # else:
         aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image, mask], Tout=[tf.float64, tf.float64])
         aug_img = tf.convert_to_tensor(aug_img)
         aug_mask = tf.convert_to_tensor(aug_mask)
@@ -93,13 +110,14 @@ def get_tensorflow_dataset_split(
     test_batch_size = 8,   
     shuffle = True,
     shuffle_buffer_fraction = 0.3,
-    reshuffle_each_iteration = True
+    reshuffle_each_iteration = True,
+    output_names = ["out"]
 ):
     
     if(train_fraction + valid_fraction + test_fraction != 1):
         raise Exception("Dataset fractions do not add up to one!")
-    
-    dataset = get_tensorflow_dataset(img_size, input_img_path, mask_img_path, seed) 
+
+    dataset = get_tensorflow_dataset(img_size, input_img_path, mask_img_path, seed, output_names=output_names) 
     #dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=True)
 
     keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent

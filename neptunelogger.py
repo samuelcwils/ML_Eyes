@@ -17,7 +17,7 @@ class NeptunePredictionsLogger(tf.keras.callbacks.Callback):
         prediction = self.model.predict(valid_image)
         prediction = prediction[0]
         valid_image = valid_image[0].numpy()
-        valid_mask = valid_mask[0].numpy()
+        valid_mask = valid_mask.popitem() if type(valid_mask) == dict else valid_mask[0].numpy() #if there are multiple masks grab the last one from the dictionary (they should all be the same)
         
         # Log image, ground truth mask, prediction, and overlay to Neptune
         mask_color = np.stack((valid_mask, valid_mask, valid_mask), axis=-1).squeeze()

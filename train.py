@@ -26,6 +26,24 @@ from savecheckpoint import SaveCheckpoint
 
 def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, high_punish=5, low_punish=1):
     tf.keras.backend.clear_session()
+
+    optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
+
+    loss_fn = getloss(loss)
+    metric = keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)
+    outputs = model.output_names
+    loss_dict = {name: loss_fn for name in model.output_names} #needed to provide a loss for each output when using a model that has multiple
+    metrics_dict = {name: metric for name in model.output_names}
+
+    model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
+                      loss=loss_dict,
+                      metrics=metrics_dict)
+                      #metrics=['accuracy', 'categorical_accuracy'])
+                      #metrics=['accuracy', 'mse'])
+    
+    # Output the model summary. This shows the sizes of input and output at
+    # each layer and number of parameters to be trained etc. 
+    model.summary()
     
     # This dataset works better and the images and masks have the same size.
     input_img_path = 'Kvasir-SEG/images/'
@@ -34,7 +52,7 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
     height = im_width
     width = im_height
 
-    train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, batch_size)
+    train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, batch_size, output_names=outputs)
 
     print("train_dataset size with batches: " + str(train_dataset.cardinality()))
 
@@ -52,20 +70,6 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
         callbacks = [predictions_neptune_callback, default_neptune_callback]
     else:
         callbacks = []
-
-    optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
-
-    loss_fn = getloss(loss)
-
-    model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
-                      loss=loss_fn,
-                      metrics=[keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)])
-                      #metrics=['accuracy', 'categorical_accuracy'])
-                      #metrics=['accuracy', 'mse'])
-    
-    # Output the model summary. This shows the sizes of input and output at
-    # each layer and number of parameters to be trained etc. 
-    model.summary()
     
     # Train the model.
     model.fit(

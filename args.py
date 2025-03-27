@@ -40,17 +40,17 @@ def get_args():
     parser.add_argument("--activation", type=str, nargs="*", choices=["ReLU", "Sigmoid", "tanh", "Softmax", "GELU", "selu", "swish"],
                         required=True, help="Activation function for hidden layers")
     parser.add_argument("--output_activation", type=str, nargs="*", choices=["Linear", "Softmax", "Sigmoid", "tanh"],
-                        required=True, help="Activation function for the output layer")
+                        help="Activation function for the output layer")
     parser.add_argument("--batch_norm", action="store_true", help="Enable batch normalization")
-    parser.add_argument("--model_type", type=str, choices=["unet_2d", "unet++"],
+    parser.add_argument("--model_type", type=str, choices=["unet_2d", "xnet", "unet3plus", "attunet"],
                         required=True, help="Type of model from keras-unet-collection")
 
     args = parser.parse_args()
 
-    # replaces lists with single values to just the single values. Don't want to pass in a list when there should be an integer
-    
+    # replaces lists with single values if not using optuna. Don't need lists if not optimizing over a range of options
+    use_optuna = args.use_optuna
     for key, value in vars(args).items():
-        if isinstance(value, list) and (len(value) == 1 ): #and (type(value[0]) != str): #I commented this out because it was causing problems with calling the model name -Ian
+        if isinstance(value, list) and not use_optuna: #I commented this out because it was causing problems with calling the model name -Ian
             setattr(args, key, value[0])  # Convert single-item list to its element
 
     # Convert Namespace object to dictionary
