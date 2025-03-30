@@ -89,7 +89,7 @@ def get_tensorflow_dataset(
     mask_img_paths = [os.path.join(mask_img_path, file) for file in os.listdir(mask_img_path) if os.path.isfile(os.path.join(mask_img_path, file))]
     dataset = tf_data.Dataset.from_tensor_slices((input_img_paths, mask_img_paths))
     dataset = dataset.map(load_imgs, num_parallel_calls=tf_data.AUTOTUNE) #the function put into .map is applied dynamically when a batch is requested
-    dataset = dataset.map(augment_data, num_parallel_calls=tf_data.AUTOTUNE)
+    #dataset = dataset.map(augment_data, num_parallel_calls=tf_data.AUTOTUNE)
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=False, seed=seed)

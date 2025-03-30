@@ -24,7 +24,7 @@ from getloss import getloss
 from savecheckpoint import SaveCheckpoint
 #from customloss import get_bitmask_loss_fn
 
-def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, high_punish=5, low_punish=1):
+def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, tags, use_optuna, high_punish=5, low_punish=1):
     tf.keras.backend.clear_session()
 
     optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
@@ -63,7 +63,7 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
 
     #create a neptune instance for each trial
     if(use_neptune):
-        trial_run = neptune.init_run(name=name + " " + "trial-" + str(trial_num), project='knightenjoyer15/Project', capture_hardware_metrics=True) 
+        trial_run = neptune.init_run(name= (name + " standalone") if not use_optuna else (name + " " + "trial-" + str(trial_num)), project='knightenjoyer15/Project', capture_hardware_metrics=True, tags=tags) 
         predictions_neptune_callback = NeptunePredictionsLogger(trial_run, model, valid_dataset) #log images of predictions to track model
         default_neptune_callback = NeptuneCallback(run=trial_run)
 
@@ -158,10 +158,11 @@ if __name__=='__main__':
     training_args, model_args = get_args()
 
     #some argparse options need to be taken out of the dictionaries
-    use_optuna = training_args.pop('use_optuna')
+    use_optuna = training_args['use_optuna']
     n_trials = training_args.pop('n_trials')
     load_checkpoint = training_args.pop("load_checkpoint")
     multi_gpu= training_args.pop('multi_gpu')
+    tags = training_args['tags']
     name = training_args["name"]
     use_neptune = training_args['use_neptune']
     seed = training_args['seed']
@@ -183,7 +184,7 @@ if __name__=='__main__':
         #create a neptune instance for the optuna study
         callbacks = []
         if(use_neptune):
-            study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key)
+            study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key, tags=tags)
             neptune_callback = npt_utils.NeptuneCallback(study_run) #for logging metadata about hyperparamter optimization
             callbacks.append(neptune_callback)
 
