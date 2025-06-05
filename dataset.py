@@ -48,42 +48,42 @@ def get_tensorflow_dataset(
         
     def augment_data(image, mask):
 
-        # if(type(mask) == dict):
-        #     mask_names = mask.keys()
+        if(type(mask) == dict):
+            mask_names = mask.keys()
 
         transforms = A.Compose([
                 A.Rotate(limit=10, border_mode=cv2.BORDER_CONSTANT),
                 A.HorizontalFlip(),
-            ],additional_targets={'mask': 'image'}, seed=seed) #apply transforms to multiple masks or one 
+            ],additional_targets=(dict(zip(mask_names, ['image'] * len(mask)))) if type(mask) == dict else {'mask': 'image'}, seed=seed) #apply transforms to multiple masks or one 
         #(dict(zip(mask_names, ['image'] * len(mask)))) if type(mask) == dict else {'mask': 'image'}
 
         def aug_fn(image, mask):
             
-            #data = {"image":image, **(dict(zip(mask_names, mask)))} if type(mask) == list else {"image":image, "mask":mask} #apply transforms to multiple masks or one 
-            data = {"image":image, "mask":mask}
+            data = {"image":image, **(dict(zip(mask_names, mask)))} if type(mask) == list else {"image":image, "mask":mask} #apply transforms to multiple masks or one 
+            #data = {"image":image, "mask":mask}
             aug_data = transforms(**data)
             aug_img = aug_data.pop("image")
-            aug_mask = aug_data["mask"]
-            #aug_mask = aug_data.values() if type(mask) == list else aug_data["mask"] #return a dictionary of multiple masks or just one mask
+            #aug_mask = aug_data["mask"]
+            aug_mask = aug_data.values() if type(mask) == list else aug_data["mask"] #return a dictionary of multiple masks or just one mask
         
             return aug_img, aug_mask
 
-        # if(type(mask) == dict):
-        #     aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image] + list(mask.values()), Tout=[tf.float64, tf.float64]) #I have to use a list beca
-        #     aug_mask = (dict(zip(mask_names, aug_mask.numpy().tolist())))
-        #     aug_img = tf.convert_to_tensor(aug_img)
-        #     aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
-        # else:
-        aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image, mask], Tout=[tf.float64, tf.float64])
-        aug_img = tf.convert_to_tensor(aug_img)
-        aug_mask = tf.convert_to_tensor(aug_mask)
-        aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
-        aug_mask = tf.ensure_shape(aug_mask, (*img_size, 1))
+        if(type(mask) == dict):
+            aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image] + list(mask.values()), Tout=[tf.float64, tf.float64]) #I have to use a list beca
+            aug_mask = (dict(zip(mask_names, aug_mask.numpy().tolist())))
+            aug_img = tf.convert_to_tensor(aug_img)
+            aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
+        else:
+            aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image, mask], Tout=[tf.float64, tf.float64])
+            aug_img = tf.convert_to_tensor(aug_img)
+            aug_mask = tf.convert_to_tensor(aug_mask)
+            aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
+            aug_mask = tf.ensure_shape(aug_mask, (*img_size, 1))
 
         return aug_img, aug_mask
 
     keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
-    tf.config.experimental.enable_op_determinism()
+   # tf.config.experimental.enable_op_determinism()
 
     input_img_paths = [os.path.join(input_img_path, file) for file in os.listdir(input_img_path) if os.path.isfile(os.path.join(input_img_path, file))]
     mask_img_paths = [os.path.join(mask_img_path, file) for file in os.listdir(mask_img_path) if os.path.isfile(os.path.join(mask_img_path, file))]
@@ -121,7 +121,7 @@ def get_tensorflow_dataset_split(
     #dataset = dataset.shuffle(buffer_size=int(int(dataset.cardinality()) * shuffle_buffer_fraction) , reshuffle_each_iteration=True)
 
     keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
-    tf.config.experimental.enable_op_determinism()
+    #tf.config.experimental.enable_op_determinism()
 
     train_dataset = dataset.take(int(len(dataset) * train_fraction)) #allot samples to train
     temp_dataset = dataset.skip(int(len(dataset) * train_fraction)) #allot rest to other datasets. store the non train samples in a temp variable

@@ -38,9 +38,9 @@ def get_args():
                         required=True, help="Number of convolutional layers per downsampling block (single value or range)")
     parser.add_argument("--stack_num_up", type=int, nargs="*", metavar=("MIN", "MAX"),
                         required=True, help="Number of convolutional layers per upsampling block (single value or range)")
-    parser.add_argument("--activation", type=str, nargs="*", choices=["ReLU", "Sigmoid", "tanh", "Softmax", "GELU", "selu", "swish"],
+    parser.add_argument("--activation", type=str, nargs="*", choices=["LeakyReLU", "ReLU", "Sigmoid", "tanh", "Softmax", "GELU", "selu", "swish"],
                         required=True, help="Activation function for hidden layers")
-    parser.add_argument("--output_activation", type=str, nargs="*", choices=["Linear", "Softmax", "Sigmoid", "tanh"],
+    parser.add_argument("--output_activation", type=str, nargs="*", choices=["LeakyReLU", "Linear", "Softmax", "Sigmoid", "tanh"],
                         help="Activation function for the output layer")
     parser.add_argument("--batch_norm", action="store_true", help="Enable batch normalization")
     parser.add_argument("--model_type", type=str, choices=["unet_2d", "xnet", "unet3plus", "attunet"],

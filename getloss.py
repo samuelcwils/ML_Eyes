@@ -44,5 +44,34 @@ def getloss(loss_name, high_punish = 1.3, low_punish = 1):
             loss = tf.math.reduce_mean(positive_loss)
             return loss
         return bitmask_loss_fn
+    elif(loss_name == "dice"):
+        def dice(y_true, y_pred):
+            """Computes the Dice loss value between `y_true` and `y_pred`.
+
+            Formula:
+            ```python
+            loss = 1 - (2 * sum(y_true * y_pred)) / (sum(y_true) + sum(y_pred))
+            ```
+
+            Args:
+                y_true: tensor of true targets.
+                y_pred: tensor of predicted targets.
+
+            Returns:
+                Dice loss value.
+            """
+            y_pred = tf.convert_to_tensor(y_pred)
+            y_true = tf.cast(y_true, y_pred.dtype)
+
+            inputs = tf.reshape(y_true, [-1])
+            targets = tf.reshape(y_pred, [-1])
+
+            intersection = tf.reduce_sum(inputs * targets)
+            dice = (2.0 * intersection) / (
+                tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + tf.keras.backend.epsilon()
+            )
+
+            return 1 - dice
+        return dice
     else:
         return keras.losses.get(loss_name)

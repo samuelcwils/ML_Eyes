@@ -24,23 +24,50 @@ from getloss import getloss
 from savecheckpoint import SaveCheckpoint
 #from customloss import get_bitmask_loss_fn
 
-def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, tags, use_optuna, high_punish=5, low_punish=1):
+def train(model_args, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, tags, use_optuna, multi_gpu, high_punish=5, low_punish=1):
     tf.keras.backend.clear_session()
 
-    optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
+    if(multi_gpu):
+        strategy = tf.distribute.MirroredStrategy()
+        print("Number of devices: %d" % strategy.num_replicas_in_sync)
 
-    loss_fn = getloss(loss)
-    metric = keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)
-    outputs = model.output_names
-    loss_dict = {name: loss_fn for name in model.output_names} #needed to provide a loss for each output when using a model that has multiple
-    metrics_dict = {name: metric for name in model.output_names}
+        with strategy.scope():
+            model = getmodel(**model_args)
+            optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
 
-    model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
-                      loss=loss_dict,
-                      metrics=metrics_dict)
-                      #metrics=['accuracy', 'categorical_accuracy'])
-                      #metrics=['accuracy', 'mse'])
-    
+            loss_fn = getloss(loss)
+            metric = keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)
+            outputs = model.output_names
+            loss_dict = {name: loss_fn for name in model.output_names} #needed to provide a loss for each output when using a model that has multiple
+            metrics_dict = {name: metric for name in model.output_names}
+
+            model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
+            loss=loss_dict,
+            metrics=metrics_dict)
+    else:
+        model = getmodel(**model_args)
+        optimizer = tf.keras.optimizers.get({"class_name": optimizer, "config": {"learning_rate": learning_rate}})
+
+        loss_fn = getloss(loss)
+        metric = keras.metrics.BinaryIoU(target_class_ids=[0, 1],threshold=0.5)
+        outputs = model.output_names
+        loss_dict = {name: loss_fn for name in model.output_names} #needed to provide a loss for each output when using a model that has multiple
+        metrics_dict = {name: metric for name in model.output_names}
+
+        model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
+        loss=loss_dict,
+        metrics=metrics_dict)
+
+    # slurm_resolver = tf.distribute.cluster_resolver.SlurmClusterResolver(port_base=15000)
+    # communication = tf.distribute.experimental.CommunicationImplementation.NCCL
+    # strategy = tf.distribute.MultiWorkerMirroredStrategy(
+    #     cluster_resolver=slurm_resolver,
+    #     communication_options=tf.distribute.experimental.CommunicationOptions(
+    #         implementation=communication
+    #     )
+    # )
+    # print('Number of replicas:', strategy.num_replicas_in_sync)
+
     # Output the model summary. This shows the sizes of input and output at
     # each layer and number of parameters to be trained etc. 
     model.summary()
@@ -110,104 +137,106 @@ def train(model, trial_num, im_width, im_height, use_neptune, use_mixed_precisio
 def objective(trial, model_args, training_args):
     #why pop varibles in the first place? -Ian
     #maybe this is a bad solution but because im popping variables I need to make a copy of the arg dicts so each iteration they can be used again
+
+    # training_dict = training_args.copy()
+    # model_dict = model_args.copy()
+
+    #  # Make copies of the original argument dictionaries
     training_dict = training_args.copy()
     model_dict = model_args.copy()
 
-    # Extract hyperparameter ranges
-    learning_rate_range = training_dict.pop('learning_rate')
-    loss_types = training_dict.pop('loss')
-    optimizer_types = training_dict.pop('optimizer')
-
-    n_filter_range = model_dict.pop('n_filters')
-    layer_depth_range = model_dict.pop('layer_depth')
-    stack_num_down_range = model_dict.pop('stack_num_down')
-    stack_num_up_range = model_dict.pop('stack_num_up')
-    activation_types = model_dict.pop('activation')
-    output_activation_types = model_dict.pop('output_activation')
-
-    # Sample hyperparameters
-    learning_rate = trial.suggest_float('learning_rate', learning_rate_range[0], learning_rate_range[1])
-    loss = trial.suggest_categorical('loss', loss_types)
-    optimizer = trial.suggest_categorical('optimizer', optimizer_types)
-
-    n_filters = trial.suggest_int('n_filters', n_filter_range[0], n_filter_range[1])
-    layer_depth = trial.suggest_int('layer_depth', layer_depth_range[0], layer_depth_range[1])
-    stack_num_down = trial.suggest_int('stack_num_down', stack_num_down_range[0], stack_num_down_range[1])
-    stack_num_up = trial.suggest_int('stack_num_up', stack_num_up_range[0], stack_num_up_range[1])
-    activation = trial.suggest_categorical('activation', activation_types)
-    output_activation = trial.suggest_categorical('output_activation', output_activation_types)
-
-    # Initialize model with sampled hyperparameters
-    model = getmodel(
-        n_filters=n_filters,
-        layer_depth=layer_depth,
-        stack_num_down=stack_num_down,
-        stack_num_up=stack_num_up,
-        activation=activation,
-        output_activation=output_activation,
-        **model_dict  # Pass any remaining arguments
+    # Sample training hyperparameters and assign them back to the dict
+    training_dict['learning_rate'] = trial.suggest_float(
+        'learning_rate',
+        training_dict['learning_rate'][0],
+        training_dict['learning_rate'][1]
     )
+    training_dict['loss'] = trial.suggest_categorical('loss', training_dict['loss'])
+    training_dict['optimizer'] = trial.suggest_categorical('optimizer', training_dict['optimizer'])
+
+    # Sample model hyperparameters and update the model dict directly
+    model_dict['n_filters'] = trial.suggest_int('n_filters', model_dict['n_filters'][0], model_dict['n_filters'][1])
+    model_dict['layer_depth'] = trial.suggest_int('layer_depth', model_dict['layer_depth'][0], model_dict['layer_depth'][1])
+    model_dict['stack_num_down'] = trial.suggest_int('stack_num_down', model_dict['stack_num_down'][0], model_dict['stack_num_down'][1])
+    model_dict['stack_num_up'] = trial.suggest_int('stack_num_up', model_dict['stack_num_up'][0], model_dict['stack_num_up'][1])
+    model_dict['activation'] = trial.suggest_categorical('activation', model_dict['activation'])
+    model_dict['output_activation'] = trial.suggest_categorical('output_activation', model_dict['output_activation'])
+
+
+    # # Initialize model with sampled hyperparameters
+    # model = getmodel(
+    #     n_filters=n_filters,
+    #     layer_depth=layer_depth,
+    #     stack_num_down=stack_num_down,
+    #     stack_num_up=stack_num_up,
+    #     activation=activation,
+    #     output_activation=output_activation,
+    #     **model_dict  # Pass any remaining arguments
+    # )
 
     # Train model and return the evaluation metric
     #use the training_args dict again become some options are not selected by optuna (e.g. seed)
-    accuracy = train(model, trial.number, learning_rate=learning_rate, loss=loss, optimizer=optimizer, **training_dict) 
-    return train(model, trial.number, learning_rate=learning_rate, loss=loss, optimizer=optimizer, **training_dict) 
+    return train(model_args=model_dict, trial_num=trial.number, **training_dict) 
 
 if __name__=='__main__':
 
-    training_args, model_args = get_args()
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+    task_index = int(os.environ.get('SLURM_PROCID', '0'))
+    if(task_index == 0):
 
-    #some argparse options need to be taken out of the dictionaries
-    use_optuna = training_args['use_optuna']
-    n_trials = training_args.pop('n_trials')
-    load_checkpoint = training_args.pop("load_checkpoint")
-    multi_gpu= training_args.pop('multi_gpu')
-    tags = training_args['tags']
-    name = training_args["name"]
-    use_neptune = training_args['use_neptune']
-    seed = training_args['seed']
-    keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
-    tf.config.experimental.enable_op_determinism()
+        training_args, model_args = get_args()
+
+        #some argparse options need to be taken out of the dictionaries
+        use_optuna = training_args['use_optuna']
+        n_trials = training_args.pop('n_trials')
+        load_checkpoint = training_args.pop("load_checkpoint")
+        #multi_gpu= training_args.pop('multi_gpu')
+        tags = training_args['tags']
+        name = training_args["name"]
+        use_neptune = training_args['use_neptune']
+        seed = training_args['seed']
+        keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
+       # tf.config.experimental.enable_op_determinism()
 
 
-    project='knightenjoyer15/Project'
-    api_key = os.environ.get('NEPTUNE_API_TOKEN')
+        project='knightenjoyer15/Project'
+        api_key = os.environ.get('NEPTUNE_API_TOKEN')
 
-    #with hyperparameter optimization
-    if(use_optuna):
-        if(load_checkpoint):
-            study = joblib.load(name + "_checkpoint.pkl")
-        else:
-            study = optuna.create_study(direction='maximize')
-        objective_seeded = partial(objective, model_args=model_args, training_args=training_args) #need to pass study in so I can save it
-        
-        #create a neptune instance for the optuna study
-        callbacks = []
-        if(use_neptune):
-            study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key, tags=tags)
-            neptune_callback = npt_utils.NeptuneCallback(study_run) #for logging metadata about hyperparamter optimization
-            callbacks.append(neptune_callback)
 
-        callbacks.append(SaveCheckpoint(name=name)) #add callback to save optuna study after every trial
+        #with hyperparameter optimization
+        if(use_optuna):
+            if(load_checkpoint):
+                study = joblib.load(name + "_checkpoint.pkl")
+            else:
+                study = optuna.create_study(direction='maximize')
+            objective_seeded = partial(objective, model_args=model_args, training_args=training_args) #need to pass study in so I can save it
+            
+            #create a neptune instance for the optuna study
+            callbacks = []
+            if(use_neptune):
+                study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key, tags=tags)
+                neptune_callback = npt_utils.NeptuneCallback(study_run) #for logging metadata about hyperparamter optimization
+                callbacks.append(neptune_callback)
 
-        if(multi_gpu):
-            gpus = tf.config.list_logical_devices('GPU')
-            strategy = tf.distribute.MirroredStrategy(gpus)
-            with strategy.scope():
-                study.optimize(objective_seeded, callbacks=callbacks,  n_trials=n_trials, gc_after_trial=True)#gc_after_trial enables garbage collection after each trial
-        else :
+            callbacks.append(SaveCheckpoint(name=name)) #add callback to save optuna study after every trial
+
+            # if(multi_gpu):
+            #     gpus = tf.config.list_logical_devices('GPU')
+            #     strategy = tf.distribute.MirroredStrategy(gpus)
+            #     with strategy.scope():
+            #         study.optimize(objective_seeded, callbacks=callbacks,  n_trials=n_trials, gc_after_trial=True)#gc_after_trial enables garbage collection after each trial
+            # else :
             study.optimize(objective_seeded, callbacks=callbacks, n_trials=n_trials, gc_after_trial=True)#gc_after_trial enables garbage collection after each trial
+            
+            if(use_neptune):
+                study_run.stop()
         
-        if(use_neptune):
-            study_run.stop()
-    
-    #no hyperparameter optimization
-    else:
-        model = getmodel(**model_args)
-        if(multi_gpu):
-            gpus = tf.config.list_logical_devices('GPU')
-            strategy = tf.distribute.MirroredStrategy(gpus)
-            with strategy.scope():
-                train(model=model, trial_num=0, **training_args)
-        else :
-            train(model=model, trial_num=0,**training_args)
+        #no hyperparameter optimization
+        else:
+            # if(multi_gpu):
+            #     gpus = tf.config.list_logical_devices('GPU')
+            #     strategy = tf.distribute.MirroredStrategy(gpus)
+            #     with strategy.scope():
+            #         train(model=model, trial_num=0, **training_args)
+            # else :
+            train(model_args=model_args, trial_num=0,**training_args)

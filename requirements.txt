@@ -1,4 +1,4 @@
-tensorflow[and-cuda]
+tensorflow
 keras
 matplotlib
 neptune
@@ -8,7 +8,6 @@ optuna
 albumentations
 opencv-python
 numpy
-argparse
 keras_unet_collection
 joblib
 
