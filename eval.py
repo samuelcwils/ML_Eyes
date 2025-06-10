@@ -3,10 +3,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from dataset import get_tensorflow_dataset_split
+from dataset import get_tensorflow_dataset
 
-input_img_path = 'Kvasir-SEG/images/'
-mask_img_path = 'Kvasir-SEG/masks/'
+img_path = 'Kvasir-SEG/'
 
 height = 256
 width = 256
@@ -83,7 +82,8 @@ def display_dataset(dataset, num_images=3):
 seed = 500
 
 num_images = 8
-train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, num_images)
+#train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, num_images)
+train_dataset =  get_tensorflow_dataset((width, height), img_path + 'trainimages', img_path + 'trainmasks', seed, augmentation=True, batch = True, batch_size = 16)
 
-display_dataset(test_dataset, 2)
+display_dataset(train_dataset, 2)
 #score = model.evaluate(test_dataset)

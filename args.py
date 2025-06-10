@@ -21,6 +21,8 @@ def get_args():
     parser.add_argument("--n_trials", type=int, help="Number of trials for hyperparamter optimization")
     parser.add_argument("--use_mixed_precision", action="store_true", help="Enable mixed precision compute")
     parser.add_argument("--multi_gpu", action="store_true", help="Enable the use of multiple gpus")
+    parser.add_argument("--dynamic_allocation", action="store_true", help="Allows Tensorflow to allocate memory dynamically")
+    parser.add_argument("--slurm", action="store_true", help="Enable the use of multiple nodes in a slurm cluster (Dont use mutli gpu arg)")
     parser.add_argument("--optimizer", nargs="*", type=str, choices=["adam", "sgd"],
                         required=True, help="Optimizer for training")
     parser.add_argument("--name", default=" ", type=str, help="The name of the study")
@@ -66,7 +68,7 @@ def get_args():
     #     args_dict.pop(key)
     
     #seperate arguments into those used for training and those used for models
-    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "high_punish", "low_punish", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name", "load_checkpoint", "tags"]
+    training_args = ["seed", "use_optuna", "use_neptune", "epochs", "learning_rate", "loss", "high_punish", "low_punish", "batch_size", "n_trials", "use_mixed_precision", "multi_gpu", "optimizer", "name", "load_checkpoint", "tags", "slurm", "dynamic_allocation"]
     training_dict = {key: args_dict.pop(key) for key in training_args if key in args_dict}
     training_dict['im_width'] = args_dict['im_width']
     training_dict['im_height'] = args_dict['im_height'] #img size is both a training and model creation parameter
