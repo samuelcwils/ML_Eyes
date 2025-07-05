@@ -23,12 +23,11 @@ import joblib
 from getloss import getloss
 from savecheckpoint import SaveCheckpoint
 import gc
+import math
 #from customloss import get_bitmask_loss_fn
 
-def train(model_args, trial_num, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, tags, use_optuna, high_punish=5, low_punish=1):
-    
-    gpus = tf.config.list_logical_devices('GPU')
-    strategy = tf.distribute.MirroredStrategy(gpus)
+def train(model_args, im_width, im_height, use_neptune, use_mixed_precision, optimizer, loss, seed, epochs, batch_size, learning_rate, name, tags, use_optuna, subtrial=0, trial=None, high_punish=5, low_punish=1):
+    keras.utils.set_random_seed(seed)
     
     if(use_mixed_precision):
         mixed_precision.set_global_policy('mixed_float16')
@@ -42,7 +41,7 @@ def train(model_args, trial_num, im_width, im_height, use_neptune, use_mixed_pre
     loss_dict = {name: loss_fn for name in model.output_names} #needed to provide a loss for each output when using a model that has multiple
     metrics_dict = {name: metric for name in model.output_names}
 
-    model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, epsilon=1e-04,),
+    model.compile(optimizer = keras.optimizers.AdamW(learning_rate=learning_rate, amsgrad=True),
     loss=loss_dict,
     metrics=metrics_dict)
     model.summary()
@@ -58,15 +57,20 @@ def train(model_args, trial_num, im_width, im_height, use_neptune, use_mixed_pre
     eval_dataset = get_tensorflow_dataset((width, height), img_path + 'evalimages', img_path + 'evalmasks', seed, augmentation=False, batch = True, batch_size = batch_size, output_names=outputs)
     #train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, batch_size, output_names=outputs)
 
+    callbacks = []
     if(use_neptune):
-        trial_run = neptune.init_run(name= (name + " standalone") if not use_optuna else (name + " " + "trial-" + str(trial_num)), project='knightenjoyer15/Project', capture_hardware_metrics=False, tags=tags) 
+        trial_run = neptune.init_run(name= (name + " standalone") if not use_optuna else (name + " " + "trial-" + str(trial.number) + "-" + str(subtrial)), project='knightenjoyer15/Project', capture_hardware_metrics=True, tags=tags) 
         #predictions_neptune_callback = NeptunePredictionsLogger(trial_run, model, valid_dataset) #log images of predictions to track model
         default_neptune_callback = NeptuneCallback(run=trial_run)
 
+        if(trial is not None):
+            trial_run["sys/group_tags"].add([tags[0] + "-" + name + " " + "trial-" + str(trial.number)])
+
         #callbacks = [predictions_neptune_callback, default_neptune_callback]
-        callbacks = [default_neptune_callback]
-    else:
-        callbacks = []
+        callbacks.append(default_neptune_callback)
+    
+    # if(trial is not None):
+    #     callbacks.append(optuna.integration.KerasPruningCallback(trial, "val_loss"))
 
     # Train the model.
     model.fit(
@@ -89,29 +93,33 @@ def train(model_args, trial_num, im_width, im_height, use_neptune, use_mixed_pre
 
     # Model evaluation (with the test data).
 
-    if(task_index == 0):
-        score = model.evaluate(eval_dataset, verbose=0)
-        print("Test loss:", score[0])
-        print("Test accuracy:", score[1])
-                
-        # Model evaluation (with the validation data). This is used because of hyperparameter searching
-        score = model.evaluate(valid_dataset, verbose=0)
-        print("Validation loss:", score[0])
-        print("Validation accuracy:", score[1])
+    score = model.evaluate(eval_dataset, verbose=0)
+    print("Test loss:", score[0])
+    print("Test accuracy:", score[1])
+            
+    # Model evaluation (with the validation data). This is used because of hyperparameter searching
+    score = model.evaluate(valid_dataset, verbose=0)
+    print("Validation loss:", score[0])
+    print("Validation accuracy:", score[1])
 
     #optimize for accuracy
-    accuracy = score[0]
+    loss = score[0]
 
     if(use_neptune):
         trial_run.stop()
+        del trial_run
 
     tf.keras.backend.clear_session()
+
+    del model
+    del train_dataset, valid_dataset, eval_dataset
+    
     gc.collect()
 
-    return accuracy
+    return loss
 
 #function that wraps around the training loop. used for hyperparamter searching with optuna
-def objective(trial, model_args, training_args):
+def objective(trial, model_args, training_args, n_subtrials):
 
     #  # Make copies of the original argument dictionaries
     training_dict = training_args.copy()
@@ -141,15 +149,27 @@ def objective(trial, model_args, training_args):
     # Train model and return the evaluation metric
     #use the training_args dict again become some options are not selected by optuna (e.g. seed)
 
-    accuracy = train(model_args=model_dict, trial_num=trial.number, **training_dict) 
+    values = []
+    for i in range(n_subtrials):
+        #num_invalid = 0
+        value = train(subtrial=i, model_args=model_dict, trial=trial, **training_dict)
+
+        while(math.isnan(value)):
+            # num_invalid = num_invalid + 1
+            # if(num_invalid == n_trials // 2):
+            #     raise optuna.TrialPruned()
+            value = train(subtrial=i, model_args=model_dict, trial=trial, **training_dict)
+        training_dict["seed"] = training_dict["seed"] + 1
+        values.append(value)
+    mean_value = np.mean(values)
 
     tf.keras.backend.clear_session()
     gc.collect()
 
-    return accuracy
+    return mean_value
 
 if __name__=='__main__':
-
+    
     task_index = int(os.environ.get('SLURM_PROCID', '0'))
     if(task_index == 0):
         print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -159,6 +179,7 @@ if __name__=='__main__':
     #some argparse options need to be taken out of the dictionaries
     use_optuna = training_args['use_optuna']
     n_trials = training_args.pop('n_trials')
+    n_subtrials = training_args.pop('n_subtrials')
     load_checkpoint = training_args.pop("load_checkpoint")
     multi_gpu = training_args.pop('multi_gpu')
     dynamic_allocation = training_args.pop('dynamic_allocation')
@@ -168,7 +189,7 @@ if __name__=='__main__':
     use_neptune = training_args['use_neptune']
     seed = training_args['seed']
     keras.utils.set_random_seed(seed) #make augmentation and loading the dataset consistent
-    # tf.config.experimental.enable_op_determinism()
+    #tf.config.experimental.enable_op_determinism()
 
     project='knightenjoyer15/Project'
     api_key = os.environ.get('NEPTUNE_API_TOKEN')
@@ -178,17 +199,20 @@ if __name__=='__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
+
     #with hyperparameter optimization
     if(use_optuna):
         if(load_checkpoint):
             study = joblib.load(name + "_checkpoint.pkl")
         else:
-            study = optuna.create_study(direction='minimize')
-        objective_seeded = partial(objective, model_args=model_args, training_args=training_args) #need to pass study in so I can save it
+            storage_name = "sqlite:///{}.db".format(name)
+            study = optuna.create_study(study_name=name, direction='minimize', storage=storage_name, load_if_exists=True)
+        objective_seeded = partial(objective, model_args=model_args, training_args=training_args, n_subtrials=n_subtrials) #need to pass study in so I can save it
         
         #create a neptune instance for the optuna study
         callbacks = []
-        if(use_neptune):
+        
+        if(use_neptune and task_index == 0):
             study_run = neptune.init_run(name=name+" optuna-study", project=project, capture_hardware_metrics=True, api_token=api_key, tags=tags)
             neptune_callback = npt_utils.NeptuneCallback(study_run) #for logging metadata about hyperparamter optimization
             callbacks.append(neptune_callback)
@@ -214,7 +238,7 @@ if __name__=='__main__':
             #strategy = tf.distribute.get_strategy() 
             study.optimize(objective_seeded, callbacks=callbacks, n_trials=n_trials, gc_after_trial=True)#gc_after_trial enables garbage collection after each trial
         
-        if(use_neptune):
+        if(use_neptune and task_index == 0):
             study_run.stop()
     
     #no hyperparameter optimization
@@ -235,4 +259,4 @@ if __name__=='__main__':
             train(model_args=model_args, trial_num=0,**training_args)
         else :
             #strategy = tf.distribute.get_strategy() 
-            train(model_args=model_args, trial_num=0,**training_args)
+            train(model_args=model_args,**training_args)

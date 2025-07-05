@@ -79,11 +79,14 @@ def display_dataset(dataset, num_images=3):
 # # Show the model architecture
 # unet_model.summary()
 
-seed = 500
+seed = 505
 
 num_images = 8
 #train_dataset, valid_dataset, test_dataset = get_tensorflow_dataset_split((width, height), input_img_path, mask_img_path, seed, 0.8, 0.1, 0.1, num_images)
 train_dataset =  get_tensorflow_dataset((width, height), img_path + 'trainimages', img_path + 'trainmasks', seed, augmentation=True, batch = True, batch_size = 16)
+
+# img_path = 'pigs/'
+# train_dataset =  get_tensorflow_dataset((width, height), img_path, img_path, seed, augmentation=False, batch = True, batch_size = 16)
 
 display_dataset(train_dataset, 2)
 #score = model.evaluate(test_dataset)

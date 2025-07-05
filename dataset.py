@@ -31,19 +31,39 @@ def get_tensorflow_dataset(
 
     def load_imgs(input_img_path, mask_img_path):
         input_img = tf_io.read_file(input_img_path)
+        input_img_shape = tf_io.extract_jpeg_shape(input_img)
         input_img = tf_io.decode_png(input_img, dtype="uint8", channels=3)
-        input_img = tf_image.resize(input_img, img_size, method="nearest")
-        input_img = tf_image.convert_image_dtype(input_img, "float64") 
+        input_img = tf_image.convert_image_dtype(input_img, "float32") 
+
+        #if the width is greater than the height and it is a wide image then crop to 4:3 and crop again with padding to 1:1 image size. Vice versa if the height is greater
+        ratio = 1.4
+        if(input_img_shape[1] > input_img_shape[0] and ((input_img_shape[1] / input_img_shape[0]) > ratio)):
+            input_img = tf.image.crop_to_bounding_box(input_img, 0, int((float(input_img_shape[1]) / 2)) - int(((float(input_img_shape[0]) * ratio) / 2)), input_img_shape[0], int(float(input_img_shape[0]) * ratio))
+            input_img = tf.image.resize_with_pad(input_img, img_size[0], img_size[1])
+        elif(input_img_shape[0] > input_img_shape[1] and ((input_img_shape[0] / input_img_shape[1]) > ratio)):
+            input_img = tf.image.crop_to_bounding_box(input_img, int((float(input_img_shape[0]) / 2)) - int(((float(input_img_shape[1]) * ratio) / 2)), 0, int(float(input_img_shape[1]) * ratio), input_img_shape[1])
+            input_img = tf.image.resize_with_pad(input_img, img_size[0], img_size[1])
+        else:
+            input_img = tf.image.resize(input_img, img_size)
+
         # I convert to floating point in the original code images are floating point. A different datatype may be better for the masks because of the loss function.
 
         mask_img = tf_io.read_file(mask_img_path)
         mask_img = tf_io.decode_png(mask_img, dtype = "uint8", channels=1)
-        mask_img = tf_image.resize(mask_img, img_size, method="nearest")
+        mask_img = tf.cast(mask_img, dtype=tf.float32)
         
-        mask_img = tf.where(mask_img > 10, 1, 0) 
+        #if the width is greater than the height and it is a wide image then crop to 4:3 and crop again with padding to 1:1 image size. Vice versa if the height is greater
+        if(input_img_shape[1] > input_img_shape[0] and ((input_img_shape[1] / input_img_shape[0]) > ratio)):
+            mask_img = tf.image.crop_to_bounding_box(mask_img, 0, int((float(input_img_shape[1]) / 2)) - int(((float(input_img_shape[0]) * ratio) / 2)), input_img_shape[0], int(float(input_img_shape[0]) * ratio))
+            mask_img = tf.image.resize_with_pad(mask_img, img_size[0], img_size[1])
+        elif(input_img_shape[0] > input_img_shape[1] and ((input_img_shape[0] / input_img_shape[1]) > ratio)):
+            mask_img = tf.image.crop_to_bounding_box(mask_img, int((float(input_img_shape[0]) / 2)) - int(((float(input_img_shape[1]) * ratio) / 2)), 0, int(float(input_img_shape[1]) * ratio), input_img_shape[1])
+            mask_img = tf.image.resize_with_pad(mask_img, img_size[0], img_size[1])
+        else:
+            mask_img = tf.image.resize(mask_img, img_size)
+        
+        mask_img = tf.where(mask_img > 10, 1.0, 0.0) 
         #This can set all values greater than a certain threshold to a certain value. Could make highlited pixels 1 and others 0. Useful for some loss functions.
-        
-        mask_img = tf.cast(mask_img, dtype=tf.float64)
             
         mask_dict = {name: mask_img for name in output_names} #needed to provide a mask for each output when using a model that has multiple outputs
         mask = mask_dict if len(output_names) > 1 else mask_img
@@ -55,8 +75,16 @@ def get_tensorflow_dataset(
             mask = mask[output_names[0]]
 
         transforms = A.Compose([
-                A.Rotate(limit=10, border_mode=cv2.BORDER_CONSTANT),
-                A.HorizontalFlip(),
+                A.HorizontalFlip(), A.VerticalFlip(p=0.5),
+                A.ColorJitter(p=0.5, brightness=(0.6, 1.6), contrast=0.2, saturation=0.1, hue=0.01),
+                A.Affine(
+                    p=0.5,
+                    scale=(1.5, 1.5),
+                    translate_percent=0.125,
+                    rotate=90,
+                    interpolation=cv2.INTER_LANCZOS4,
+                ),
+                A.ElasticTransform(p=0.5, interpolation=cv2.INTER_LANCZOS4)
             ],additional_targets={'mask': 'image'}, seed=seed)
     
         def aug_fn(image, mask):
@@ -67,9 +95,12 @@ def get_tensorflow_dataset(
         
             return aug_img, aug_mask
 
-        aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image, mask], Tout=[tf.float64, tf.float64])
+        aug_img, aug_mask = tf.numpy_function(func=aug_fn, inp=[image, mask], Tout=[tf.float32, tf.float32])
         aug_img = tf.convert_to_tensor(aug_img)
         aug_mask = tf.convert_to_tensor(aug_mask)
+
+        aug_mask = tf.where(aug_mask > 0.5, 1, 0) 
+
         aug_img = tf.ensure_shape(aug_img, (*img_size, 3))
         aug_mask = tf.ensure_shape(aug_mask, (*img_size, 1))
 

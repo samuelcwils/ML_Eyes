@@ -2,6 +2,7 @@
 The custom loss functions are used to train the model and are passed to the model during compilation."""
 import tensorflow as tf
 import keras
+import tensorflow.keras.backend as K
 
 #gave defaults for punishing values so you don't have to enter them when not using the custom loss. Not sure if this is the best
 #way to do this. Ian let me know what you think.
@@ -45,31 +46,15 @@ def getloss(loss_name, high_punish = 1.3, low_punish = 1):
             return loss
         return bitmask_loss_fn
     elif(loss_name == "dice"):
-        def dice(y_true, y_pred):
-            """Computes the Dice loss value between `y_true` and `y_pred`.
+        def dice(ground_truth, predictions, smooth=1e-6):
+            ground_truth = K.cast(ground_truth, tf.float32)
+            predictions = K.cast(predictions, tf.float32)
+            ground_truth = K.flatten(ground_truth)
+            predictions = K.flatten(predictions)
+            intersection = K.sum(predictions * ground_truth)
+            union = K.sum(predictions) + K.sum(ground_truth)
 
-            Formula:
-            ```python
-            loss = 1 - (2 * sum(y_true * y_pred)) / (sum(y_true) + sum(y_pred))
-            ```
-
-            Args:
-                y_true: tensor of true targets.
-                y_pred: tensor of predicted targets.
-
-            Returns:
-                Dice loss value.
-            """
-            y_pred = tf.convert_to_tensor(y_pred)
-            y_true = tf.cast(y_true, y_pred.dtype)
-
-            inputs = tf.reshape(y_true, [-1])
-            targets = tf.reshape(y_pred, [-1])
-
-            intersection = tf.reduce_sum(inputs * targets)
-            dice = (2.0 * intersection) / (
-                tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + tf.keras.backend.epsilon()
-            )
+            dice = (2. * intersection + smooth) / (union + smooth)
 
             return 1 - dice
         return dice
